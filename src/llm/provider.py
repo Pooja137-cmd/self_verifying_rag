@@ -59,3 +59,4 @@ def get_llm(cfg) -> LLMClient:
     if cfg.llm_provider == "ollama":
         return OllamaClient(cfg.llm_model, cfg.llm_base_url, cfg.llm_temperature, cfg.seed)
     raise ValueError(f"Unknown llm_provider: {cfg.llm_provider!r} (add it in src/llm/provider.py)")
+    

@@ -9,3 +9,4 @@ langgraph
 streamlit
 openai
 pytest
+matplotlib
