@@ -9,3 +9,7 @@ data/raw/
 data/processed/
 evaluation/results/
 *.log
+
+rag/
+
+rag/
