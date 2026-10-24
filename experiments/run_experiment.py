@@ -1,8 +1,6 @@
 ﻿"""Run one experimental condition (A-F) over a slice of questions. Resumable.
-
-  python experiments/run_experiment.py --condition E --n 40 --name cond_E
-Latency reported = non-LLM wall time + LLM time of the ORIGINAL (uncached) generations, i.e. standalone cost.
-"""
+  python experiments/run_experiment.py --condition E --n 40 --name v3r_E --premise-mode windows --revise
+Latency = non-LLM wall time + LLM time of the ORIGINAL (uncached) generations (standalone cost)."""
 from __future__ import annotations
 
 import argparse
@@ -33,8 +31,7 @@ from src.utils import read_json, read_jsonl, set_seed, write_json  # noqa: E402
 CACHE_PATH = ROOT / "evaluation" / "cache" / "llm_cache.jsonl"
 
 
-def build_record(item: dict, state: dict, cond: str, delta: dict, latency: float, wall: float,
-                 nli_pairs: int, cache_hits: int) -> dict:
+def build_record(item, state, cond, delta, latency, wall, nli_pairs, cache_hits) -> dict:
     gold = set(item["gold_doc_ids"])
     first_docs = state["history"][0]["doc_ids"]
     results = state["results"]
@@ -46,9 +43,10 @@ def build_record(item: dict, state: dict, cond: str, delta: dict, latency: float
         "flagged_unverified": state.get("flagged_unverified", False),
         "answer": state.get("answer"), "statement": state.get("statement"), "parse_ok": state.get("parse_ok"),
         "raw_output": state.get("raw_output"), "claims": state.get("claims", []),
-        "claim_fallback": state.get("claim_fallback", False), "claim_results": state.get("claim_results", []),
+        "claim_fallback": state.get("claim_fallback", False),
+        "answer_in_claims": state.get("answer_in_claims"), "claim_results": state.get("claim_results", []),
         "claim_risk": state.get("claim_risk"), "claim_verified": state.get("claim_verified", False),
-        "critic_action": state.get("critic_action"),
+        "critic_action": state.get("critic_action"), "revisions": state.get("revisions", 0),
         "risk_level": state.get("risk_level", "NA"), "risk_score": state.get("risk_score", 0.0),
         "evidence": state.get("evidence"),
         "rounds": state["round"], "re_retrieved": state["round"] > 0,
@@ -74,6 +72,8 @@ def main() -> None:
     ap.add_argument("--claim-threshold-file", default=str(RESULTS_DIR / "claim_threshold.json"))
     ap.add_argument("--final-policy", default="abstain", choices=["abstain", "accept_flagged", "abstain_if_contradicted"])
     ap.add_argument("--use-contradiction", action="store_true")
+    ap.add_argument("--premise-mode", default="joint", choices=["joint", "pairs", "windows"])
+    ap.add_argument("--revise", action="store_true", help="enable the LLM Revise step in the critic loop")
     ap.add_argument("--index-dir", default=str(INDEX_DIR / "hotpot_dev200"))
     ap.add_argument("--questions", default=str(DATA_PROCESSED / "questions.json"))
     args = ap.parse_args()
@@ -91,8 +91,9 @@ def main() -> None:
         support = float(read_json(thr_path)["support_threshold"])
     else:
         support = ClaimVerifierConfig().support_threshold
-    cv_cfg = ClaimVerifierConfig(support_threshold=support)
-    pcfg = make_condition(args.condition, final_policy=args.final_policy, use_contradiction=args.use_contradiction)
+    cv_cfg = ClaimVerifierConfig(support_threshold=support, premise_mode=args.premise_mode)
+    pcfg = make_condition(args.condition, final_policy=args.final_policy,
+                          use_contradiction=args.use_contradiction, revise=args.revise)
 
     store = VectorStore.load(args.index_dir, Embedder(cfg.embedding_model, cfg.query_instruction))
     llm = CachedLLM(get_llm(cfg), CACHE_PATH)
@@ -106,7 +107,8 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     done = {r["id"] for r in read_jsonl(out)} if out.exists() else set()
     print(f"condition={args.condition}  model={cfg.llm_model}  n={len(questions)}  done={len(done)}  "
-          f"support_threshold={support}  risk=[low {risk_cfg.low_threshold:.3f}, high {risk_cfg.high_threshold:.3f}]")
+          f"premise_mode={args.premise_mode}  revise={args.revise}  support_threshold={support}  "
+          f"risk=[low {risk_cfg.low_threshold:.3f}, high {risk_cfg.high_threshold:.3f}]")
 
     with out.open("a", encoding="utf-8") as f:
         for i, item in enumerate(questions, 1):
@@ -118,13 +120,13 @@ def main() -> None:
             wall = time.perf_counter() - t0
             delta = llm.usage.delta(before)
             latency = (wall - (llm.wall_s - wall0_llm)) + delta["llm_latency_s"]
-            rec = build_record(item, state, args.condition, delta, latency, wall,
-                               nli.n_pairs - pairs0, llm.hits - hits0)
+            rec = build_record(item, state, args.condition, delta, latency, wall, nli.n_pairs - pairs0,
+                               llm.hits - hits0)
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             f.flush()
             print(f"[{i}/{len(questions)}] wall={wall:.0f}s standalone={latency:.0f}s calls={delta['llm_calls']} "
-                  f"risk={rec['risk_level']} rr={int(rec['re_retrieved'])} cv={int(rec['claim_verified'])} "
-                  f"pred={rec['final_answer']!r} gold={item['answer']!r}")
+                  f"risk={rec['risk_level']} rr={int(rec['re_retrieved'])} rev={rec['revisions']} "
+                  f"cv={int(rec['claim_verified'])} pred={rec['final_answer']!r} gold={item['answer']!r}")
 
     ids = {q["id"] for q in questions}
     rows = [r for r in read_jsonl(out) if r["id"] in ids]

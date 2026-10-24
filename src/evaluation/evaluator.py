@@ -28,6 +28,7 @@ def summarize_condition(rows: list[dict]) -> dict:
         "initial_all_hit": _mean([float(r["initial_all_hit"]) for r in rows]),
         "final_all_hit": _mean([float(r["final_all_hit"]) for r in rows]),
         "re_retrieval_rate": _mean([float(r["re_retrieved"]) for r in rows]),
+        "revision_rate": _mean([float(r.get("revisions", 0) > 0) for r in rows]),
         "claim_verification_rate": _mean([float(r["claim_verified"]) for r in rows]),
         "avg_latency_s": _mean([r["latency_s"] for r in rows]),
         "avg_llm_calls": _mean([r["llm_calls"] for r in rows]),

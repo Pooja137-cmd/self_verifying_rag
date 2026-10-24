@@ -1,11 +1,12 @@
-﻿"""Claim Extraction Agent. Default is rule-based sentence splitting (zero LLM calls).
-Optional atomic decomposition via the LLM (one call) for longer answers; falls back to sentences."""
+﻿"""Claim Extraction Agent. Default is rule-based sentence splitting (zero LLM calls), now abbreviation-aware.
+Optional atomic decomposition via the LLM (one call); falls back to sentences."""
 from __future__ import annotations
 
 import json
 import re
 
-from src.retrieval.chunking import clean_text, split_sentences
+from src.retrieval.chunking import clean_text
+from src.retrieval.sentences import split_sentences_safe
 
 ABSTAIN_MARK = "insufficient information"
 
@@ -21,7 +22,7 @@ def extract_claims_rule(answer: str, min_words: int = 3) -> list[str]:
     text = re.sub(r"^answer:\s*", "", text, flags=re.I)
     if not text or ABSTAIN_MARK in text.lower():
         return []
-    return [s for s in split_sentences(text) if len(s.split()) >= min_words and not s.endswith("?")]
+    return [s for s in split_sentences_safe(text) if len(s.split()) >= min_words and not s.endswith("?")]
 
 
 class ClaimExtractor:
@@ -41,4 +42,4 @@ class ClaimExtractor:
             claims = [c.strip() for c in json.loads(resp.text)["claims"] if isinstance(c, str) and c.strip()]
             return (claims or base)[: self.max_claims]
         except Exception:
-            return base[: self.max_claims]  # malformed JSON -> sentence-level fallback
+            return base[: self.max_claims]

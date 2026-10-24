@@ -11,8 +11,12 @@ import pandas as pd  # noqa: E402
 from src.config import RESULTS_DIR  # noqa: E402
 from src.evaluation.answer_metrics import contains_gold  # noqa: E402
 from src.utils import read_jsonl  # noqa: E402
+import os  # noqa: E402
 
-OUT = RESULTS_DIR / "report"
+PREFIX = os.environ.get("RESULT_PREFIX", "cond_")
+REPORT_DIR = "report" if PREFIX == "cond_" else "report_" + PREFIX.strip("_")
+
+OUT = RESULTS_DIR / REPORT_DIR
 
 
 def classify(r: dict) -> dict:
@@ -42,7 +46,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     recs = []
     for c in "ABCDEF":
-        p = RESULTS_DIR / f"cond_{c}.jsonl"
+        p = RESULTS_DIR / f"{PREFIX}{c}.jsonl"
         if p.exists():
             recs += [classify(r) for r in read_jsonl(p)]
         else:

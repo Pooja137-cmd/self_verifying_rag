@@ -1,9 +1,11 @@
 ﻿"""Local NLI scorer (CPU) on a sentence-transformers CrossEncoder. No LLM, no cost."""
 from __future__ import annotations
 
+import os
+
 import numpy as np
 
-DEFAULT_NLI_MODEL = "cross-encoder/nli-deberta-v3-small"
+DEFAULT_NLI_MODEL = os.environ.get("NLI_MODEL", "cross-encoder/nli-deberta-v3-small")
 _FALLBACK_ORDER = ["contradiction", "entailment", "neutral"]  # documented order for cross-encoder NLI models
 
 

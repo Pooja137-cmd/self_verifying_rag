@@ -19,10 +19,14 @@ from src.config import RESULTS_DIR  # noqa: E402
 from src.evaluation.answer_metrics import contains_gold, exact_match  # noqa: E402
 from src.evaluation.evaluator import summarize_condition  # noqa: E402
 from src.utils import read_jsonl  # noqa: E402
+import os  # noqa: E402
+
+PREFIX = os.environ.get("RESULT_PREFIX", "cond_")
+REPORT_DIR = "report" if PREFIX == "cond_" else "report_" + PREFIX.strip("_")
 
 LABELS = {"A": "A Vanilla RAG", "B": "B +Evidence", "C": "C +Claim", "D": "D +Evidence+Claim",
           "E": "E Risk-adaptive", "F": "F Always-on"}
-OUT = RESULTS_DIR / "report"
+OUT = RESULTS_DIR / REPORT_DIR
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -47,7 +51,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     data: dict[str, dict[str, dict]] = {}
     for c in LABELS:
-        p = RESULTS_DIR / f"cond_{c}.jsonl"
+        p = RESULTS_DIR / f"{PREFIX}{c}.jsonl"
         if p.exists():
             data[c] = {r["id"]: r for r in read_jsonl(p)}
         else:
@@ -72,7 +76,7 @@ def main() -> None:
             "condition": LABELS[c], "n": s["n"], "EM": s["EM"], "contains_gold": s["contains_gold"],
             "abstain": s["abstain_rate"], "wrong_rate": s["wrong_answer_rate"],
             "wrong_95CI": f"[{lo:.2f}, {hi:.2f}]", "final_all_hit": s["final_all_hit"],
-            "re_retrieval": s["re_retrieval_rate"], "claim_verif": s["claim_verification_rate"],
+            "re_retrieval": s["re_retrieval_rate"], "revision": s.get("revision_rate"), "claim_verif": s["claim_verification_rate"],
             "latency_s": s["avg_latency_s"], "llm_calls": s["avg_llm_calls"], "tokens": s["avg_total_tokens"]})
     tdf = pd.DataFrame(table)
     tdf.to_csv(OUT / "table_main.csv", index=False)

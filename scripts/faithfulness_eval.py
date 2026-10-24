@@ -18,17 +18,21 @@ from src.config import RESULTS_DIR  # noqa: E402
 from src.evaluation.answer_metrics import contains_gold  # noqa: E402
 from src.graph.workflow import claims_from_generation  # noqa: E402
 from src.utils import read_jsonl  # noqa: E402
+import os  # noqa: E402
+
+PREFIX = os.environ.get("RESULT_PREFIX", "cond_")
+REPORT_DIR = "report" if PREFIX == "cond_" else "report_" + PREFIX.strip("_")
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--model", default="cross-encoder/nli-MiniLM2-L6-H768")
 ap.add_argument("--conditions", default="ABCDEF")
 args = ap.parse_args()
 
-cv = ClaimVerifier(NLIScorer(args.model), ClaimVerifierConfig(support_threshold=0.5))
+cv = ClaimVerifier(NLIScorer(args.model), ClaimVerifierConfig(support_threshold=0.5, premise_mode=os.environ.get("PREMISE_MODE", "joint")))
 ext = ClaimExtractor()
 table = []
 for c in args.conditions:
-    p = RESULTS_DIR / f"cond_{c}.jsonl"
+    p = RESULTS_DIR / f"{PREFIX}{c}.jsonl"
     if not p.exists():
         print(f"condition {c}: NOT YET MEASURED")
         continue
@@ -48,7 +52,7 @@ for c in args.conditions:
 df = pd.DataFrame(table)
 print(f"\nIndependent NLI model: {args.model}\n")
 print(df.to_string(index=False))
-out = RESULTS_DIR / "report"
+out = RESULTS_DIR / REPORT_DIR
 out.mkdir(parents=True, exist_ok=True)
 df.to_csv(out / "faithfulness.csv", index=False)
 print("\nwrong_but_supported = retrieval/evidence-induced error; wrong_and_unsupported = closer to hallucination.")

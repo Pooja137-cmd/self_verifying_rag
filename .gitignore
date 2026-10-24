@@ -15,3 +15,5 @@ rag/
 rag/
 
 evaluation/cache/
+
+evaluation/frozen/*/
