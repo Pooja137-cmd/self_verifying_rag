@@ -99,9 +99,12 @@ class Pipeline:
                                            "entailment": [round(c["entailment"], 3) for c in dumped]})}
 
     def n_critic(self, state):
+        contradicted = any(c["verdict"] == "CONTRADICTED" for c in state["claim_results"])
         if state["round"] < self.cfg.max_rounds:
             action = "RE_RETRIEVE"
         elif self.cfg.final_policy == "abstain":
+            action = "ABSTAIN"
+        elif self.cfg.final_policy == "abstain_if_contradicted" and contradicted:
             action = "ABSTAIN"
         else:
             action = "ACCEPT_FLAGGED"

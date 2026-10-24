@@ -72,7 +72,7 @@ def main() -> None:
     ap.add_argument("--support-threshold", type=float, default=None)
     ap.add_argument("--risk-config", default=str(RESULTS_DIR / "risk_config.json"))
     ap.add_argument("--claim-threshold-file", default=str(RESULTS_DIR / "claim_threshold.json"))
-    ap.add_argument("--final-policy", default="abstain", choices=["abstain", "accept_flagged"])
+    ap.add_argument("--final-policy", default="abstain", choices=["abstain", "accept_flagged", "abstain_if_contradicted"])
     ap.add_argument("--use-contradiction", action="store_true")
     ap.add_argument("--index-dir", default=str(INDEX_DIR / "hotpot_dev200"))
     ap.add_argument("--questions", default=str(DATA_PROCESSED / "questions.json"))
